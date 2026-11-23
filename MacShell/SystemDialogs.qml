@@ -278,7 +278,7 @@ Scope {
                     width: Math.min(parent.width - 60, 740)
                     height: Math.min(parent.height - 80, 540)
                     radius: 18
-                    color: root.darkMode ? Qt.rgba(0.11, 0.11, 0.13, 0.96) : Qt.rgba(0.97, 0.97, 0.98, 0.98)
+                    color: root.darkMode ? "#1A1A1E" : "#F5F5F7"
                     border.width: 1; border.color: root.darkMode ? Qt.rgba(1, 1, 1, 0.18) : Qt.rgba(0, 0, 0, 0.12)
                     MouseArea { anchors.fill: parent }
 

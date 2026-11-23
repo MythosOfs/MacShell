@@ -10442,10 +10442,11 @@ Scope {
                     // exactly the glass + border of the Wi-Fi / Bluetooth / audio popovers (same context, blur, rim, no drop shadow, no inner shading)
                     PopGlassCtx { id: notifPopGlass; pop: notifPop; frame: ui; source: ui.glassSrc; fullW: notifPop.fullW; fullH: notifPop.fullH }
                     Rectangle {
-                        visible: !root.liquidActive
                         anchors.fill: parent
                         radius: Math.min(26, 8 + 18 * notifPop.t)
-                        color: root.effDark ? Qt.rgba(0.11, 0.11, 0.13, 0.94) : Qt.rgba(0.96, 0.96, 0.98, 0.96)
+                        color: root.effDark
+                               ? Qt.rgba(0.11, 0.11, 0.13, root.liquidActive ? 0.82 : 0.96)
+                               : Qt.rgba(0.96, 0.96, 0.98, root.liquidActive ? 0.84 : 0.97)
                     }
                     GGlass {
                         anchors.fill: parent
