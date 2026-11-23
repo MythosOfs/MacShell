@@ -2110,8 +2110,10 @@ Scope {
                     id: dock
                     width: root.isVertical ? root.bgHeight : (row.implicitWidth + root.hPad * 2)
                     height: root.isVertical ? (row.implicitHeight + root.hPad * 2) : root.bgHeight
-                    scale: root.isVertical && height > (ui.height - 24) ? Math.max(0.55, (ui.height - 24) / height) : 1.0
-                    transformOrigin: root.dockPosition === "left" ? Item.Left : (root.dockPosition === "right" ? Item.Right : Item.Center)
+                    scale: root.isVertical
+                           ? (height > (ui.height - 24) ? Math.max(0.55, (ui.height - 24) / height) : 1.0)
+                           : (width > (ui.width - 24) ? Math.max(0.55, (ui.width - 24) / width) : 1.0)
+                    transformOrigin: root.dockPosition === "left" ? Item.Left : (root.dockPosition === "right" ? Item.Right : Item.Bottom)
                     x: root.dockPosition === "left"
                        ? (root.margin - (ui.tucked ? width + root.margin + 6 : 0))
                        : (root.dockPosition === "right"
