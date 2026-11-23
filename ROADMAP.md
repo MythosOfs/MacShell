@@ -28,66 +28,66 @@ Items are grouped by area. Each item includes a brief note on the current state 
 
 ## 2. Menu Bar & Control Center
 
-- [ ] **Real Global Menu (`DBusMenu`)** — Replace or augment the hardcoded per-category menus (`File / Edit / View / Window / Help` in `MacShell/MacBar.qml`) with real application menu trees via `com.canonical.AppMenu.Registrar` / `DBusMenu`, including a searchable *Help* menu.
-- [ ] **Auto-hide Menu Bar** — Option to hide the menu bar (globally or in fullscreen) and slide it in when the pointer hits the top screen edge.
-- [ ] **Reorder & Hide Menu Bar Items** — Hold modifier + drag to reorder or hide status/tray icons directly on the bar.
-- [ ] **Live Activities in Menu Bar** — macOS Tahoe–style compact status pills in the menu bar for ongoing activities (active timers from `ClockApp`, calls, recordings, background progress).
-- [ ] **Real Focus Modes** — Expand *Settings → Focus* (`MacShell/MacDock.qml`, currently only Do Not Disturb + Keep Awake) into customizable Focus profiles (Work, Sleep, Personal, Gaming) with schedules, per-app notification allowlists, and optional per-Focus wallpapers.
-- [ ] **Additional Control Center Modules** — Add missing tiles/sliders to `ccCatalog` in `MacShell/MacBar.qml`: Keyboard Brightness slider, Screen Mirroring / Display Casting, and AirDrop / Nearby Share toggle.
+- [x] **Real Global Menu (`DBusMenu`)** — `MacShell/assets/appmenu-bridge.py` + `MacShell/MacBar.qml` claim `com.canonical.AppMenu.Registrar`, query real `com.canonical.dbusmenu` menu trees (with nested submenus, shortcuts, and checkmarks) for the focused app with automatic fallback to built-in menus, and add a macOS-style searchable *Help* menu filtering all active app menu items.
+- [x] **Auto-hide Menu Bar** — Configurable in *Settings → Menu Bar* (`Never` / `Full Screen` / `Always`) and via `menubar autohide` IPC; drops `exclusiveZone` when hidden and slides smoothly back in when hovering the top screen edge.
+- [x] **Reorder & Hide Menu Bar Items** — Hold `Alt` (or `Meta`) and drag status items in `MacShell/MacBar.qml` (`MacShell/MenuBar.js`) to reorder them horizontally (persisted in `barRightOrder`), or drag downward off the bar to hide them.
+- [x] **Live Activities in Menu Bar** — macOS Tahoe–style compact status pills in the menu bar (`MacShell/MenuBar.js` + `MacShell/MacBar.qml`) for active `ClockApp` timers/stopwatches/ringing alarms, screen recordings, and active Discord voice calls.
+- [x] **Real Focus Modes** — `MacShell/FocusModes.js`, *Settings → Focus* (`MacShell/SettingsWindow.qml`), and Control Center's Focus sub-page provide customizable profiles (`Do Not Disturb`, `Work`, `Sleep`, `Personal`, `Gaming`) with schedules (including overnight ranges), per-app notification allowlists, optional per-Focus wallpapers, Game Mode linking, and `focus` IPC.
+- [x] **Additional Control Center Modules** — Added Keyboard Brightness slider (`kbbacklight`), Screen Mirroring / Display Casting tile + monitor/cast sub-page (`mirroring`), and AirDrop / Nearby Share toggle (`airdrop`, LocalSend / KDE Connect / Warpinator) to `ccCatalog` in `MacShell/MacBar.qml`.
 
 ---
 
 ## 3. Dock
 
-- [ ] **Dock Folders / Stacks** — Pin folders (e.g. Downloads, Documents) next to Trash with macOS-style Fan, Grid, and List popovers.
-- [ ] **Left & Right Dock Positioning** — Support vertical Dock orientation on the left or right screen edge, including magnification and glass layout.
-- [ ] **Notification Badges** — Show red unread badge counters on Dock app icons (e.g. via Unity/LauncherEntry D-Bus or unread notification counts).
-- [ ] **Recent Apps Section** — Optional section between pinned apps and Trash showing the last N recently closed applications.
-- [ ] **Drag & Drop Files onto Dock App Icons** — Allow dropping files from the desktop (or file managers) onto any Dock app icon to open them with that app (currently only Trash accepts desktop drops).
+- [x] **Dock Folders / Stacks** — Pin folders (e.g. Downloads, Documents, Pictures) next to Trash in `MacShell/MacDock.qml` (`MacShell/DockLogic.js`) with switchable Fan, Grid, and List popovers, right-click view switching, and Settings controls.
+- [x] **Left & Right Dock Positioning** — `dockPosition` (`bottom` | `left` | `right`) in `MacShell/MacDock.qml`, `MacShell/Desktop.qml`, *Settings → Dock*, and `dock position` IPC adapts PanelWindow anchors, vertical Grid layout, Y-axis magnification, glass backdrop offsets, and popovers.
+- [x] **Notification Badges** — Red macOS unread counters on Dock app icons fed by `MacBar.qml`'s per-app unread notification map (`notifAppCounts`, auto-cleared on app focus or Notification Center open) plus `dock badge` IPC overrides.
+- [x] **Recent Apps Section** — Persisted `recentApps` section between pinned/running apps and Trash showing the last N recently closed unpinned apps, with *Keep in Dock* and *Remove from Recent* context actions and a Settings toggle.
+- [x] **Drag & Drop Files onto Dock App Icons** — Dragging Desktop icons (via `Desktop.qml` `appDropHit`/`dropFilesOnApp`) or external file-manager URLs (via Qt `DropArea`) onto any Dock app icon opens them with that app (and onto Dock folders moves them in).
 
 ---
 
 ## 4. Spotlight (macOS Tahoe Parity)
 
-- [ ] **Full-Text & Metadata File Search** — Upgrade file search (`find -iname` in `MacShell/MacBar.qml`) to support indexed content/metadata search (e.g. local FTS index, Recoll/Tracker/ripgrep integration) for documents, PDFs, and notes.
-- [ ] **Quick Look Preview Pane** — Split-view preview panel on the right side of Spotlight results for files, images, screenshots, and documents.
-- [ ] **Spotlight Actions & Quick Keys** — Expand the *Actions* tab beyond the 6 power/system commands to support app actions, user-defined shortcuts/scripts, quick keys, and direct creation of timers, reminders, and notes.
-- [ ] **Inline Knowledge Cards** — Live currency conversion, dictionary definitions, and inline weather/stock summary cards directly in Spotlight results.
+- [x] **Full-Text & Metadata File Search** — `MacShell/assets/spotlight-search.py` upgrades `MacBar.qml` file search with ranked filename + ripgrep full-text content search (showing matching line snippets), file size/mtime metadata, and `pdftotext` PDF excerpt support.
+- [x] **Quick Look Preview Pane** — Split-view preview pane (`spPreviewPane` in `MacShell/MacBar.qml`) renders images, screenshots, text/code/PDF excerpts, directory listings, file metadata, and Open / Copy Path actions alongside Spotlight results.
+- [x] **Spotlight Actions & Quick Keys** — Expanded *Actions* tab with system/window/media commands, user-defined `spotlightActions`, and quick keys (`t 5m` / `timer`, `note`, `remind`, `focus`) powered by `MacShell/Spotlight.js`.
+- [x] **Inline Knowledge Cards** — Live currency conversion (`100 USD to EUR`, `50€ in $` with cached FX rates), dictionary definitions (`define <word>`), and inline weather (`weather`) & stock (`stock AAPL` / `$AAPL`) summary cards in Spotlight.
 
 ---
 
 ## 5. Notifications, Widgets & Desktop
 
-- [ ] **Grouped / Stacked Notifications** — Collapse multiple notifications from the same app into an expandable stack in Notification Center.
-- [ ] **Combined Notification Center + Widgets Sidebar** — Clicking the clock (or swiping from the right edge) opens a unified right-hand panel showing notifications alongside widgets, rather than only the calendar popover.
-- [ ] **Multi-Monitor Desktop Widgets** — Lift the primary-monitor-only limitation in `MacShell/MacWidgets.qml` so widgets can be placed on any connected display.
-- [ ] **Desktop Stacks** — Automatically group desktop files into expandable stacks by file type, date, or tag in `MacShell/Desktop.qml`.
-- [ ] **System-Wide Quick Look (`Space`)** — Instant floating Liquid Glass preview for images, PDFs, video, audio, and code/markdown files triggered via `Space` (beyond the current desktop right-click image/info preview).
+- [x] **Grouped / Stacked Notifications** — `MacShell/DesktopWidgets.js` + `MacShell/MacBar.qml` collapse multiple notifications from the same app into expandable stacks with a `+N more` / `Show less` toggle pill.
+- [x] **Combined Notification Center + Widgets Sidebar** — Clicking the Menu Bar clock opens the unified Notification Center + Widgets Sidebar (`notifPop` + `notifWidgetsStrip` showing mini Calendar and Weather cards alongside notifications; right-click opens standalone Calendar).
+- [x] **Multi-Monitor Desktop Widgets** — Lifted the primary-monitor-only limit in `MacShell/MacWidgets.qml` so widgets persist a `screen` property, render on all connected displays, and can be moved across monitors in edit mode.
+- [x] **Desktop Stacks** — Right-click Desktop → *Use Stacks* (`Kind` / `Date`) groups desktop files into expandable stacks via `MacShell/DesktopWidgets.js` + `MacShell/Desktop.qml` with a floating stack popover.
+- [x] **System-Wide Quick Look (`Space`)** — `MacShell/QuickLook.qml` provides an instant floating Liquid Glass preview for images, PDFs, code/markdown/text, folders, and media metadata via Desktop `Space`/Quick Preview, Spotlight Quick Look button, and `quicklook` IPC.
 
 ---
 
 ## 6. Screenshots, System Dialogs & Settings
 
-- [ ] **Floating Screenshot Thumbnail** — Show a draggable preview thumbnail in the bottom-right corner after capturing, with click-to-edit and auto-dismiss.
-- [ ] **Built-in Markup / Annotation Editor** — Quick annotation tools (arrows, shapes, text, blur/redact, crop) directly on captured screenshots.
-- [ ] **Capture Toolbar (`Cmd+Shift+5` style)** — Unified on-screen bar to switch between region/window/screen screenshot and screen recording, plus timer delay, mic/system audio toggle, and destination picker.
-- [ ] **Liquid Glass Polkit Auth Agent** — Native macOS-style authentication prompt supporting password and fingerprint (`fprintd`).
-- [ ] **Force Quit Dialog & Native Activity Monitor** — Dedicated `Cmd+Opt+Esc` Force Quit window and a built-in Liquid Glass Activity Monitor (currently the button in `MacShell/MacBar.qml` launches external tools like `gnome-system-monitor` or `btop`).
-- [ ] **Missing System Settings Panes**:
-  - [ ] **Storage** — Color-coded disk usage breakdown bar and cleanup helpers.
-  - [ ] **Privacy & Security** — App permissions (camera/mic/screen portals) and firewall controls.
-  - [ ] **Accessibility** — Screen zoom, color filters, cursor size/shake-to-find (currently only Reduce Motion).
-  - [ ] **Login Items / Autostart** — Manage XDG autostart entries and background services.
-  - [ ] **Date & Time** — Timezone picker, NTP toggle, and date format options.
-  - [ ] **Printers & Scanners** — CUPS printer status and queue management.
-  - [ ] **Sharing** — Toggles for SSH, SMB/Samba, and screen sharing.
-  - [ ] **System Software Update** — Unified distro package update checker alongside MacShell's own updater.
+- [x] **Floating Screenshot Thumbnail** — `MacShell/CaptureSuite.qml` displays a bottom-right preview thumbnail after capture (`MacBar.qml` `shotSaveProc`) with hover pause, auto-dismiss, Copy, and click-to-Markup.
+- [x] **Built-in Markup / Annotation Editor** — `MacShell/CaptureSuite.qml` provides Canvas annotation tools (Arrow, Box, Pen, Redact, Text), color palette, Undo, and Save & Copy directly on captured screenshots (`capture markup <path>`).
+- [x] **Capture Toolbar (`Cmd+Shift+5` style)** — Bottom-center Liquid Glass bar in `MacShell/CaptureSuite.qml` (`capture toolbar` IPC) switching between Entire Screen, Window, Selection, and Screen Recording with 0s/5s/10s countdown delay.
+- [x] **Liquid Glass Polkit Auth Agent** — `MacShell/PolkitAuth.qml` provides a native macOS-style authentication prompt with password verification, `fprintd` fingerprint detection, and `polkit` IPC.
+- [x] **Force Quit Dialog & Native Activity Monitor** — `MacShell/SystemDialogs.qml` adds a `Force Quit Applications` dialog (`forcequit` IPC / Apple menu) and a native tabbed Liquid Glass Activity Monitor (`activity` IPC / Menu Bar System Monitor / Apple menu).
+- [x] **Missing System Settings Panes** (`MacShell/SystemSettingsPanes.js`, `MacShell/MacDock.qml`, `MacShell/SettingsWindow.qml`, all searchable in Spotlight):
+  - [x] **Storage** — Color-coded disk usage breakdown bar and Trash / MacShell cache cleanup helpers.
+  - [x] **Privacy & Security** — Active mic/camera/screen consumers and firewall (`ufw`/`firewall-cmd`) status.
+  - [x] **Accessibility** — Reduce Motion, Hyprland screen zoom slider, and cursor size controls.
+  - [x] **Login Items / Autostart** — Manage `~/.config/autostart/*.desktop` entries (`Hidden` toggle).
+  - [x] **Date & Time** — Timezone display, NTP toggle (`timedatectl`), and 24-hour/date/seconds options.
+  - [x] **Printers & Scanners** — CUPS printer status (`lpstat`) and CUPS Admin quick launch.
+  - [x] **Sharing** — Hostname and SSH, SMB/Samba, and Screen Sharing (`wayvnc`) controls.
+  - [x] **System Software Update** — Distro package update checker (`checkupdates`/`pacman`/`apt`/`dnf`) alongside MacShell updates.
 
 ---
 
 ## 7. Ecosystem & Linux Integrations
 
-- [ ] **AirDrop / Continuity / Phone Mirroring** — Integrate KDE Connect / GSConnect, LocalSend, and `scrcpy` into the Control Center, share menus, and notifications for file drops, universal clipboard, and phone mirroring.
-- [ ] **Time Machine UI** — Visual snapshot browser and file restore interface backed by Btrfs + Snapper (or Timeshift).
-- [ ] **Aerial Screensavers** — Slow-motion video screensavers in `MacLock` that smoothly slow down and freeze into the desktop wallpaper upon unlock.
-- [ ] **Finder Integration / Companion** — Deeper file-manager experience (column view, Finder tags, inspector, quick actions) or a dedicated macOS-style file browser.
+- [x] **AirDrop / Continuity / Phone Mirroring** — `MacShell/EcosystemApps.qml` + `MacShell/Ecosystem.js` integrate KDE Connect / GSConnect (device discovery, Universal Clipboard send, Ring, file share), LocalSend, and `scrcpy` phone mirroring into Continuity Hub (`continuity` IPC), Control Center, Spotlight, and Desktop *Share via AirDrop…* context menus.
+- [x] **Time Machine UI** — Visual snapshot browser and non-destructive file restore UI in `MacShell/EcosystemApps.qml` backed by Btrfs + Snapper (`snapper --csvout list`) with Timeshift fallback, Quick Look preview, and `timemachine` IPC.
+- [x] **Aerial Screensavers** — Slow-motion video screensavers in `MacLock/shell.qml` + `MacLock/LockScreen.qml` (`aerialVideo` / `aerialRate` in `~/.config/maclock/settings.json`) that smoothly decelerate and freeze into the desktop on unlock.
+- [x] **Finder Integration / Companion** — Built-in Liquid Glass Finder Companion in `MacShell/EcosystemApps.qml` (`finder` IPC / Spotlight) with Favorites sidebar, 3-column Miller View, persistent Finder Color Tags (`~/.config/macshell/finder-tags.json`), and live Inspector with Quick Actions (Open, Quick Look, Markup, AirDrop Share, Copy Path).

@@ -14,6 +14,7 @@ import Quickshell.Wayland
 import "I18n.js" as I18n
 import "Fonts.js" as Fonts
 import "EmojiData.js" as EmojiData
+import "DesktopWidgets.js" as DesktopWidgets
 
 Scope {
     id: root
@@ -31,7 +32,11 @@ Scope {
     readonly property bool enabled: dock ? dock.desktopIcons : true
 
     onXdgDesktopChanged: if (enabled) scan()
-    property var items: []                  // { name, path, isDir, isApp, kind }
+    property var rawItems: []               // ungrouped files on Desktop
+    property bool useStacks: false          // macOS Desktop Stacks
+    property string stackGroupBy: "kind"    // "kind" | "date"
+    property var activeStack: null          // expanded stack object { stackName, stackItems }
+    readonly property var items: DesktopWidgets.buildDesktopStacks(rawItems, useStacks, stackGroupBy, Date.now())
     property var places: ({})               // "screen::name" → { x, y }
 
     // ── selection (path → true) ──
@@ -106,8 +111,17 @@ Scope {
     function dockRect(screenName, screenW, screenH) {
         var d = dock;
         if (!d || !d.dockEnabled || (d.monitor && d.monitor !== "" && d.monitor !== screenName)) return null;
-        var dw = Math.min(screenW, Math.max(440, d.bgWidth || 540));
+        var pos = d.dockPosition || "bottom";
         var dh = Math.max(76, d.bgHeight || 88);
+        if (pos === "left") {
+            var vhL = Math.min(screenH, Math.max(360, d.totalW0 ? d.totalW0 + 48 : 520));
+            return { x: 0, y: (screenH - vhL) / 2, width: dh + 10, height: vhL };
+        }
+        if (pos === "right") {
+            var vhR = Math.min(screenH, Math.max(360, d.totalW0 ? d.totalW0 + 48 : 520));
+            return { x: screenW - dh - 10, y: (screenH - vhR) / 2, width: dh + 10, height: vhR };
+        }
+        var dw = Math.min(screenW, Math.max(440, d.bgWidth || 540));
         return { x: (screenW - dw) / 2, y: screenH - dh - 10, width: dw, height: dh + 10 };
     }
     function barBottom() { return (bar && bar.barEnabled) ? bar.barH : 0; }
@@ -149,12 +163,9 @@ Scope {
         return { x: bx, y: by, score: best };
     }
     function collidesWithDock(x, y, screenName, screenW, screenH) {
-        var d = dock;
-        if (!d || !d.dockEnabled || (d.monitor && d.monitor !== "" && d.monitor !== screenName)) return false;
-        var dw = Math.min(screenW, Math.max(440, d.bgWidth || 540));
-        var dh = Math.max(76, d.bgHeight || 88);
-        return rectanglesOverlap(x, y, cellW, cellH,
-            { x: (screenW - dw) / 2, y: screenH - dh - 10, width: dw, height: dh + 10 }, 4);
+        var r = dockRect(screenName, screenW, screenH);
+        if (!r) return false;
+        return rectanglesOverlap(x, y, cellW, cellH, r, 4);
     }
     function gridCells(screenW, screenH) {
         var cols = Math.max(0, Math.floor((screenW - 2 * gridSide) / cellW));
@@ -439,7 +450,7 @@ Scope {
     function scan() {
         lsProc.running = false;
         lsProc.command = ["sh", "-c",
-            "mkdir -p \"$1\"; cd \"$1\" && find . -mindepth 1 -maxdepth 1 ! -name '.*' -printf '%Y\\t%y\\t%f\\n' 2>/dev/null | LC_ALL=C sort -t\"$(printf '\\t')\" -k1,1 -k3,3f | head -200", "sh", root.dir];
+            "mkdir -p \"$1\"; cd \"$1\" && find . -mindepth 1 -maxdepth 1 ! -name '.*' -printf '%Y\\t%y\\t%T@\\t%f\\n' 2>/dev/null | LC_ALL=C sort -t\"$(printf '\\t')\" -k1,1 -k4,4f | head -200", "sh", root.dir];
         lsProc.running = true;
     }
     property string lastScanText: ""
@@ -454,13 +465,14 @@ Scope {
                 var out = [], ls = text.split("\n");
                 for (var i = 0; i < ls.length; i++) {
                     var c = ls[i].split("\t");
-                    if (c.length < 3) continue;
-                    var name = c[2], isDir = c[0] === "d", isLink = c[1] === "l", isApp = /\.desktop$/i.test(name);
+                    if (c.length < 4) continue;
+                    var name = c.slice(3).join("\t"), isDir = c[0] === "d", isLink = c[1] === "l", isApp = /\.desktop$/i.test(name);
+                    var mtime = Number(c[2]) || 0;
                     var e = name.toLowerCase().split(".").pop();
-                    out.push({ name: name, path: root.dir + "/" + name, isDir: isDir, isApp: isApp, isLink: isLink,
+                    out.push({ name: name, path: root.dir + "/" + name, isDir: isDir, isApp: isApp, isLink: isLink, mtime: mtime,
                                kind: isDir ? "Folder" : (["png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"].indexOf(e) >= 0 ? "Image" : "File") });
                 }
-                root.items = out;
+                root.rawItems = out;
             }
         }
     }
@@ -573,7 +585,9 @@ Scope {
             color: "transparent"
             WlrLayershell.namespace: "macdesktop"
             WlrLayershell.layer: WlrLayer.Bottom
-            WlrLayershell.keyboardFocus: ((renameSheet.open || linkSheet.open || emojiSheet.open) && !root.picking) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+            WlrLayershell.keyboardFocus: ((renameSheet.open || linkSheet.open || emojiSheet.open) && !root.picking)
+                                         ? WlrKeyboardFocus.Exclusive
+                                         : (root.selectionCount > 0 ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
 
             // The whole screen takes the pointer (empty desktop: selection rectangle, right-click menu) EXCEPT
             //   * interactive widgets' buttons (Player, Reminders), which live in the widgets window and still have to be clickable, and
@@ -647,7 +661,8 @@ Scope {
             // The icons thrown into the Trash shrink, turn a little and fly into the Trash icon one after the other, then the Trash hops.
             // the Trash icon lifts while a dragged icon is held over it
             property bool trashArmed: false
-            property bool dockRevealed: false     // an auto-hidden Dock was brought up because an icon is held at the bottom edge
+            property bool dockRevealed: false     // an auto-hidden Dock was brought up because an icon is held at the Dock edge
+            property string dockAppArmedKey: ""
             function setDockReveal(on) {
                 if (dockRevealed === on) return;
                 dockRevealed = on;
@@ -656,15 +671,23 @@ Scope {
             function updateTrashArmOff() {
                 setDockReveal(false);
                 if (trashArmed) { trashArmed = false; if (root.dock && root.dock.trashArm) root.dock.trashArm(modelData.name, false); }
+                if (dockAppArmedKey !== "") { dockAppArmedKey = ""; if (root.dock && root.dock.appDropArm) root.dock.appDropArm(modelData.name, ""); }
             }
             function updateTrashArm(x, y) {
-                // nothing is thrown here: the Trash only lifts while the icon is held over it. The throw happens in finishDrag, on release.
-                if (y >= height - 28) setDockReveal(true);
-                else if (!trashArmed) setDockReveal(false);
+                var pos = (root.dock && root.dock.dockPosition) ? root.dock.dockPosition : "bottom";
+                var nearEdge = (pos === "left" && x <= 28) || (pos === "right" && x >= width - 28) || (pos === "bottom" && y >= height - 28);
+                if (nearEdge) setDockReveal(true);
+                else if (!trashArmed && dockAppArmedKey === "") setDockReveal(false);
                 var on = !!(root.dock && root.dock.trashHit && root.dock.trashHit(modelData.name, x, y));
-                if (on === trashArmed) return;
-                trashArmed = on;
-                if (root.dock && root.dock.trashArm) root.dock.trashArm(modelData.name, on);
+                if (on !== trashArmed) {
+                    trashArmed = on;
+                    if (root.dock && root.dock.trashArm) root.dock.trashArm(modelData.name, on);
+                }
+                var appKey = (!on && root.dock && root.dock.appDropHit) ? root.dock.appDropHit(modelData.name, x, y) : "";
+                if (appKey !== dockAppArmedKey) {
+                    dockAppArmedKey = appKey;
+                    if (root.dock && root.dock.appDropArm) root.dock.appDropArm(modelData.name, appKey);
+                }
             }
             function flyToTrash(list, dx, dy, px, py) {
                 if (root.dock && root.dock.trashExpect) root.dock.trashExpect();     // this one already animates: the Dock must not hop a second time
@@ -687,6 +710,7 @@ Scope {
                 var dx = dragDX, dy = dragDY;
                 // decided at the moment of release, before the Dock is allowed to slide away again
                 var overTrash = !!(root.dock && root.dock.trashHit && root.dock.trashHit(modelData.name, px, py));
+                var overAppKey = (!overTrash && root.dock && root.dock.appDropHit) ? root.dock.appDropHit(modelData.name, px, py) : "";
                 updateTrashArmOff();
                 dragActive = false; dragDX = 0; dragDY = 0; dropPath = "";
                 if (moved.length === 0) return;
@@ -694,6 +718,11 @@ Scope {
                 if (overTrash) {
                     flyToTrash(moved, dx, dy, px, py);
                     root.trashMany(moved.map(function (it) { return it.path; }));
+                    return;
+                }
+                // let go over any Dock app icon: open the dragged files with that application
+                if (overAppKey !== "" && root.dock && root.dock.dropFilesOnApp) {
+                    root.dock.dropFilesOnApp(overAppKey, moved.map(function (it) { return it.path; }));
                     return;
                 }
                 var target = iconAt(px, py);
@@ -838,7 +867,86 @@ Scope {
                     onDoubleClicked: mouse => {
                         if (ignoring || mouse.button !== Qt.LeftButton || addMode) return;
                         var it = w.iconAt(mouse.x, mouse.y);
+                        if (it && it.isStack) { root.activeStack = it; return; }
                         if (it) root.openItem(it);
+                    }
+                }
+                Item {
+                    id: desktopKeyCatcher
+                    focus: root.selectionCount > 0 && !w.sheetOpen
+                    Keys.onSpacePressed: {
+                        var sel = root.selectedItems();
+                        if (sel.length > 0 && !sel[0].isStack && root.hub && root.hub.quickLook) {
+                            root.hub.quickLook.togglePath(sel[0].path);
+                        }
+                    }
+                    Keys.onEscapePressed: {
+                        if (root.activeStack !== null) root.activeStack = null;
+                        else root.clearSelection();
+                    }
+                }
+
+                // Expanded Desktop Stack overlay
+                Rectangle {
+                    id: deskStackPop
+                    visible: root.activeStack !== null
+                    z: 45
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width - 60, 420)
+                    height: Math.min(parent.height - 120, Math.max(140, deskStackCol.implicitHeight + 28))
+                    radius: 18
+                    color: root.darkMode ? Qt.rgba(0.11, 0.11, 0.13, 0.94) : Qt.rgba(0.97, 0.97, 0.98, 0.96)
+                    border.width: 1; border.color: root.darkMode ? Qt.rgba(1, 1, 1, 0.18) : Qt.rgba(0, 0, 0, 0.12)
+                    Column {
+                        id: deskStackCol
+                        anchors.fill: parent; anchors.margins: 14; spacing: 8
+                        Item {
+                            width: parent.width; height: 24
+                            Text {
+                                anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+                                text: root.activeStack ? (root.activeStack.stackName + " (" + root.activeStack.stackCount + ")") : ""
+                                color: root.darkMode ? "#FFFFFF" : "#1D1D1F"
+                                font.family: Fonts.forWeight(Font.DemiBold, root.fam); font.pixelSize: 14; font.weight: Font.DemiBold
+                            }
+                            Text {
+                                anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                                text: I18n.tr("Close"); color: root.accent; font.pixelSize: 12
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.activeStack = null }
+                            }
+                        }
+                        Flickable {
+                            width: parent.width; height: Math.min(300, dscList.implicitHeight)
+                            contentHeight: dscList.implicitHeight; clip: true
+                            Column {
+                                id: dscList; width: parent.width; spacing: 4
+                                Repeater {
+                                    model: root.activeStack ? root.activeStack.stackItems : []
+                                    delegate: Rectangle {
+                                        id: dscRow; required property var modelData
+                                        width: dscList.width; height: 32; radius: 8
+                                        color: dscRowMa.containsMouse ? root.accent : "transparent"
+                                        Text {
+                                            x: 10; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 78; elide: Text.ElideRight
+                                            text: dscRow.modelData.name
+                                            color: dscRowMa.containsMouse ? "#FFFFFF" : (root.darkMode ? "#FFFFFF" : "#1D1D1F")
+                                            font.family: Fonts.forWeight(Font.Normal, root.fam); font.pixelSize: 12
+                                        }
+                                        Text {
+                                            anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                                            text: I18n.tr("Preview"); color: dscRowMa.containsMouse ? "#FFFFFF" : root.accent; font.pixelSize: 11
+                                            MouseArea {
+                                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                onClicked: { if (root.hub && root.hub.quickLook) root.hub.quickLook.openPath(dscRow.modelData.path); }
+                                            }
+                                        }
+                                        MouseArea {
+                                            id: dscRowMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; z: -1
+                                            onClicked: { var p = dscRow.modelData; root.activeStack = null; root.openItem(p); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -977,12 +1085,18 @@ Scope {
                         var a = dctx.app, hasDir = a.selectedItems().some(function (x) { return x.isDir; });
                         if (it && it.widget) return [{ t: "Widget Settings\u2026", k: "widgets" }];
                         if (!it) return [{ t: "New Folder", k: "newfolder" }, { t: "Add Folder to Desktop\u2026", k: "link" },
+                                         { t: "sep" },
+                                         { t: (a.useStacks ? "\u2713 " : "") + "Use Stacks", k: "stacks" },
+                                         { t: "Group Stacks By: " + (a.stackGroupBy === "date" ? "Date" : "Kind"), k: "stackmode" },
                                          { t: "sep" }, { t: "Desktop Settings\u2026", k: "settings" }, { t: "Change Wallpaper\u2026", k: "wallpaper" }];
                         var m = [{ t: "Open", k: "open" }];
                         if (a.selectionCount <= 1) { m.push({ t: "Quick Preview", k: "ql" }); m.push({ t: "Rename\u2026", k: "rename" }); }
                         if (hasDir) { m.push({ t: "sep" }); m.push({ t: "colors" }); m.push({ t: "Folder Icon\u2026", k: "glyph" }); m.push({ t: "Folder Emoji\u2026", k: "emoji" }); }
                         m.push({ t: "sep" });
-                        if (a.selectionCount <= 1) m.push({ t: "Copy Path", k: "copy" });
+                        if (a.selectionCount <= 1) {
+                            m.push({ t: "Share via AirDrop\u2026", k: "share" });
+                            m.push({ t: "Copy Path", k: "copy" });
+                        }
                         m.push({ t: "Move to Trash", k: "trash", danger: true });
                         m.push({ t: "sep" }); m.push({ t: "New Folder", k: "newfolder" });
                         return m;
@@ -997,8 +1111,17 @@ Scope {
                     function run(k) {
                         var a = dctx.app, it = dctx.item, sel = a.selectedItems();
                         dctx.item = undefined;
-                        if (k === "open" && it) { for (var i = 0; i < sel.length; i++) a.openItem(sel[i]); }
-                        else if (k === "ql" && it) { if (it.kind === "Image") picSheet.begin(it); else previewSheet.begin(it); }
+                        if (k === "open" && it) {
+                            if (it.isStack) a.activeStack = it;
+                            else { for (var i = 0; i < sel.length; i++) a.openItem(sel[i]); }
+                        }
+                        else if (k === "ql" && it) {
+                            if (a.hub && a.hub.quickLook && !it.isStack) a.hub.quickLook.openPath(it.path);
+                            else if (it.kind === "Image") picSheet.begin(it);
+                            else previewSheet.begin(it);
+                        }
+                        else if (k === "stacks") { a.useStacks = !a.useStacks; a.activeStack = null; }
+                        else if (k === "stackmode") { a.stackGroupBy = a.stackGroupBy === "kind" ? "date" : "kind"; a.activeStack = null; }
                         else if (k === "rename" && it) renameSheet.begin(it);
                         else if (k === "link") linkSheet.begin();
                         else if (k === "settings" && a.dock) a.dock.openPrefs("dock");
@@ -1010,6 +1133,7 @@ Scope {
                             a.setFolderColor(dirs, k.substring(6));
                         }
                         else if (k === "copy" && it) Quickshell.execDetached(["sh", "-c", "printf '%s' \"$1\" | wl-copy", "sh", it.path]);
+                        else if (k === "share" && it && a.hub && a.hub.eco) a.hub.eco.shareFile(it.path);
                         else if (k === "trash" && it) {
                             w.flyToTrash(sel, 0, 0, dctx.clickX, dctx.clickY);      // the same fly-into-the-Trash as a drag and drop
                             a.trashMany(sel.map(function (s) { return s.path; }));

@@ -53,18 +53,29 @@ Item {
             scale: ls.leaving ? 1.06 : (ls.shown ? 1.0 : 1.09)
             Behavior on scale { NumberAnimation { duration: ls.leaving ? 520 : 650; easing.type: Easing.OutQuint } }
         }
-        // animated wallpaper: the same video MacShell plays on the desktop, muted and looping
+        // Aerial screensaver / animated wallpaper: slow-motion video that smoothly decelerates and freezes into desktop on unlock
         Loader {
             id: wallVideo
             anchors.fill: wall
             scale: wall.scale
-            active: ls.st.wallpaperVideo !== ""
+            readonly property string videoSrc: ls.st.aerialVideo !== "" ? ls.st.aerialVideo : ls.st.wallpaperVideo
+            readonly property bool isAerial: ls.st.aerialVideo !== ""
+            active: videoSrc !== ""
             sourceComponent: Item {
                 MediaPlayer {
-                    source: "file://" + ls.st.wallpaperVideo
+                    id: aerialMp
+                    source: "file://" + wallVideo.videoSrc
                     loops: MediaPlayer.Infinite
+                    playbackRate: ls.leaving ? 0.12 : (wallVideo.isAerial ? ls.st.aerialRate : 1.0)
+                    Behavior on playbackRate { NumberAnimation { duration: 420; easing.type: Easing.OutCubic } }
                     videoOutput: vo
                     Component.onCompleted: play()
+                }
+                Timer {
+                    id: aerialFreezeT
+                    interval: 380
+                    running: ls.leaving && wallVideo.isAerial
+                    onTriggered: aerialMp.pause()
                 }
                 VideoOutput { id: vo; anchors.fill: parent; fillMode: VideoOutput.PreserveAspectCrop }
             }
@@ -350,6 +361,7 @@ Item {
                 x: 78 * ls.u; y: 14 * ls.u
                 width: parent.width - x - 16 * ls.u
                 Text {
+                    width: parent.width; elide: Text.ElideRight
                     text: ls.liveKind === "timer" && liveCard.tm ? (liveCard.tm.label || I18n.tr("Timer")) + (liveCard.tm.state === "paused" ? I18n.tr(" · Paused") : "")
                         : (ls.liveKind === "sw" ? "Stopwatch" : (ls.liveKind === "ring" && ls.clockSt.ringing ? (ls.clockSt.ringing.kind === "timer" ? "Timer" : "Alarm") : ""))
                     color: "#FF9F0A"; font.family: ls.fam; font.pixelSize: 13 * ls.u; font.weight: Font.DemiBold

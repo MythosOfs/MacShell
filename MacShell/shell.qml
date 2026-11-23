@@ -47,6 +47,11 @@ ShellRoot {
         property var minimizeFx: minimizeFxObj
         property var wm: windowMgmt
         property var mc: missionControl
+        property var quickLook: quickLookObj
+        property var capture: captureSuiteObj
+        property var dialogs: systemDialogsObj
+        property var polkit: polkitAuthObj
+        property var eco: ecosystemAppsObj
         function openSettings(pane) { macDock.openPrefs(pane); }
 
         // set by MacBar / MacDock / WindowDecor / WindowMgmt (Binding elements) when they need live window geometry
@@ -573,6 +578,11 @@ ShellRoot {
     MinimizeFx { id: minimizeFxObj; hub: sharedHub; effect: macDock.minimizeEffect; speed: macDock.minimizeSpeed }
     WindowMgmt { id: windowMgmt; hub: sharedHub }
     MissionControl { id: missionControl; hub: sharedHub }
+    QuickLook { id: quickLookObj; hub: sharedHub }
+    CaptureSuite { id: captureSuiteObj; hub: sharedHub }
+    SystemDialogs { id: systemDialogsObj; hub: sharedHub }
+    PolkitAuth { id: polkitAuthObj; hub: sharedHub }
+    EcosystemApps { id: ecosystemAppsObj; hub: sharedHub }
 
     Component.onCompleted: {
         sharedHub.bar = macBar;
@@ -698,5 +708,88 @@ ShellRoot {
         function toggle(): void { windowMgmt.toggleQuickNote(); }
         function open(): void { windowMgmt.openQuickNote(); }
         function close(): void { windowMgmt.closeQuickNote(); }
+    }
+    // qs -c MacShell ipc call focus toggle | on | off | set <id>
+    IpcHandler {
+        target: "focus"
+        function toggle(): void { macBar.toggleDnd(); }
+        function on(): void { macBar.setFocusMode("dnd", false); }
+        function off(): void { macBar.setFocusMode("", false); }
+        function set(id: string): void { macBar.setFocusMode(id, false); }
+    }
+    // qs -c MacShell ipc call menubar autohide <never|fullscreen|always> | resetOrder
+    IpcHandler {
+        target: "menubar"
+        function autohide(mode: string): void {
+            if (["never", "fullscreen", "always"].indexOf(mode) >= 0) macBar.barAutoHide = mode;
+        }
+        function resetOrder(): void { macBar.barRightOrder = []; }
+    }
+    // qs -c MacShell ipc call dock position <bottom|left|right> | badge <app> <count> | addFolder <path>
+    IpcHandler {
+        target: "dock"
+        function position(pos: string): void {
+            if (["bottom", "left", "right"].indexOf(pos) >= 0) macDock.dockPosition = pos;
+        }
+        function badge(app: string, count: int): void { macDock.setBadgeOverride(app, count); }
+        function addFolder(path: string): void { macDock.addDockFolder(path, "fan"); }
+    }
+    // qs -c MacShell ipc call quicklook open <path> | toggle <path> | close
+    IpcHandler {
+        target: "quicklook"
+        function open(path: string): void { quickLookObj.openPath(path); }
+        function toggle(path: string): void { quickLookObj.togglePath(path); }
+        function close(): void { quickLookObj.close(); }
+    }
+    // qs -c MacShell ipc call capture toolbar | markup <path> | closeMarkup | thumb <path> | dismissThumb
+    IpcHandler {
+        target: "capture"
+        function toolbar(): void { captureSuiteObj.toggleToolbar(); }
+        function markup(path: string): void { captureSuiteObj.openMarkup(path); }
+        function closeMarkup(): void { captureSuiteObj.closeMarkup(); }
+        function thumb(path: string): void { captureSuiteObj.showThumbnail(path); }
+        function dismissThumb(): void { captureSuiteObj.dismissThumbnail(); }
+    }
+    // qs -c MacShell ipc call forcequit toggle | open | close
+    IpcHandler {
+        target: "forcequit"
+        function toggle(): void { systemDialogsObj.toggleForceQuit(); }
+        function open(): void { systemDialogsObj.openForceQuit(); }
+        function close(): void { systemDialogsObj.closeForceQuit(); }
+    }
+    // qs -c MacShell ipc call activity toggle | open | close
+    IpcHandler {
+        target: "activity"
+        function toggle(): void { systemDialogsObj.toggleActivity(); }
+        function open(): void { systemDialogsObj.openActivity(); }
+        function close(): void { systemDialogsObj.closeActivity(); }
+    }
+    // qs -c MacShell ipc call polkit prompt <msg> <cmd> | close
+    IpcHandler {
+        target: "polkit"
+        function prompt(msg: string, cmd: string): void { polkitAuthObj.prompt(msg, cmd, ""); }
+        function close(): void { polkitAuthObj.close(); }
+    }
+    // qs -c MacShell ipc call continuity toggle | open | close | share <path>
+    IpcHandler {
+        target: "continuity"
+        function toggle(): void { ecosystemAppsObj.toggleContinuity(); }
+        function open(): void { ecosystemAppsObj.openContinuity(); }
+        function close(): void { ecosystemAppsObj.closeContinuity(); }
+        function share(path: string): void { ecosystemAppsObj.shareFile(path); }
+    }
+    // qs -c MacShell ipc call timemachine toggle | open | close
+    IpcHandler {
+        target: "timemachine"
+        function toggle(): void { ecosystemAppsObj.toggleTimeMachine(); }
+        function open(): void { ecosystemAppsObj.openTimeMachine(); }
+        function close(): void { ecosystemAppsObj.closeTimeMachine(); }
+    }
+    // qs -c MacShell ipc call finder toggle | open <dir> | close
+    IpcHandler {
+        target: "finder"
+        function toggle(): void { ecosystemAppsObj.toggleFinder(""); }
+        function open(dir: string): void { ecosystemAppsObj.openFinder(dir); }
+        function close(): void { ecosystemAppsObj.closeFinder(); }
     }
 }
