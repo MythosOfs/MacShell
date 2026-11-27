@@ -2088,6 +2088,16 @@ Scope {
                     }
                 }
 
+                // Second hider for the Liquid Glass backdrop: bsrc unloads with glassLayer when Liquid Glass turns off (Game Mode),
+                // but the backdrop stays loaded 450 ms to drain its captures and was drawn as gray window placeholders.
+                ShaderEffectSource {
+                    sourceItem: glassBackdrop.item
+                    hideSource: true
+                    live: false
+                    width: 1; height: 1
+                    opacity: 0
+                }
+
                 Item {
                     id: maskItem
                     readonly property real maskW: hh.hovered ? Math.min(ui.width, Math.ceil((dock.width + 8) / 64) * 64) : dock.width
